@@ -107,6 +107,14 @@ func NewBootstrapAction(config BootstrapConfig) actions.Fn {
 			return nil
 		}
 
+		// Ensure the cert-manager namespace exists before creating the
+		// Certificate. On re-deploy the CRDs may survive CR deletion (they
+		// have no owner reference) while the namespace is gone, so SSA of
+		// the Certificate would fail with "namespace not found".
+		ns := &unstructured.Unstructured{}
+		ns.SetGroupVersionKind(gvk.Namespace)
+		ns.SetName(config.CertManagerNamespace)
+
 		issuer, err := createSelfSignedIssuer(config)
 		if err != nil {
 			return err
@@ -122,7 +130,7 @@ func NewBootstrapAction(config BootstrapConfig) actions.Fn {
 			return err
 		}
 
-		return rr.AddResources(issuer, caCert, caIssuer)
+		return rr.AddResources(ns, issuer, caCert, caIssuer)
 	}
 }
 
