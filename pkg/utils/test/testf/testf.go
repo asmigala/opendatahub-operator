@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
+	gomegaTypes "github.com/onsi/gomega/types"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -130,6 +131,34 @@ func (tc *TestContext) Scheme() *runtime.Scheme {
 }
 
 func (tc *TestContext) NewWithT(t *testing.T, opts ...WithTOpts) *WithT {
+	t.Helper()
+
+	g := gomega.NewWithT(t)
+	g.SetDefaultEventuallyTimeout(DefaultTimeout)
+	g.SetDefaultEventuallyPollingInterval(DefaultPollInterval)
+	g.SetDefaultConsistentlyDuration(DefaultTimeout)
+	g.SetDefaultConsistentlyPollingInterval(DefaultPollInterval)
+
+	answer := WithT{
+		ctx:    tc.ctx,
+		client: tc.client,
+		WithT:  g,
+	}
+
+	for _, opt := range tc.withTOpts {
+		opt(&answer)
+	}
+
+	for _, opt := range opts {
+		opt(&answer)
+	}
+
+	return &answer
+}
+
+// NewGinkgoWithT is like NewWithT but accepts gomega's GomegaTestingT interface,
+// allowing it to work with Ginkgo's GinkgoT() which does not satisfy testing.TB.
+func (tc *TestContext) NewGinkgoWithT(t gomegaTypes.GomegaTestingT, opts ...WithTOpts) *WithT {
 	t.Helper()
 
 	g := gomega.NewWithT(t)
