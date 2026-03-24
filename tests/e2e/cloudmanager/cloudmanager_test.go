@@ -34,18 +34,20 @@ func TestCloudManager_DeploymentSelfHealing(t *testing.T) {
 	createCR(t, wt, allManaged())
 	waitForDeploymentsAvailable(wt)
 
-	// Delete the cert-manager deployment out from under the controller.
-	target := managedDependencyDeployments[0]
-	wt.Expect(target.Name).To(ContainSubstring("cert-manager"), "expected first managed deployment to be cert-manager")
-	nn := types.NamespacedName{Name: target.Name, Namespace: target.Namespace}
+	for _, dep := range managedDependencyDeployments {
+		t.Run(dep.Name, func(t *testing.T) {
+			wt := tc.NewWithT(t)
+			nn := types.NamespacedName{Name: dep.Name, Namespace: dep.Namespace}
 
-	wt.Delete(gvk.Deployment, nn).Eventually().Should(Succeed())
-	wt.Get(gvk.Deployment, nn).Eventually().Should(BeNil())
+			wt.Delete(gvk.Deployment, nn).Eventually().Should(Succeed())
+			wt.Get(gvk.Deployment, nn).Eventually().Should(BeNil())
 
-	// The controller should recreate it.
-	wt.Get(gvk.Deployment, nn).Eventually().Should(
-		jq.Match(`.status.conditions[] | select(.type == "Available") | .status == "True"`),
-	)
+			// The controller should recreate it.
+			wt.Get(gvk.Deployment, nn).Eventually().Should(
+				jq.Match(`.status.conditions[] | select(.type == "Available") | .status == "True"`),
+			)
+		})
+	}
 }
 
 // TestCloudManager_GarbageCollectionOnDelete verifies that deleting the CR
