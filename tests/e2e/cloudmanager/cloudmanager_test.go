@@ -257,6 +257,9 @@ func TestCloudManager_ServiceAccountsCreated(t *testing.T) {
 
 // TestCloudManager_StatusAfterSpecChange verifies that updating the CR spec
 // triggers re-reconciliation and the status reflects the new generation.
+// Unlike UnmanagedNotReconciled (which tests behavioral consequences of
+// switching to Unmanaged), this test focuses on the status tracking contract:
+// observedGeneration must catch up after each spec mutation.
 func TestCloudManager_StatusAfterSpecChange(t *testing.T) {
 	wt := tc.NewWithT(t)
 	createCR(t, wt, allManaged())
@@ -264,9 +267,9 @@ func TestCloudManager_StatusAfterSpecChange(t *testing.T) {
 
 	// Capture the current generation.
 	cr := wt.Get(provider.GVK, k8sEngineCrNn()).Eventually().Should(Not(BeNil()))
-	gen, _, _ := unstructured.NestedInt64(cr.Object, "metadata", "generation")
+	gen1, _, _ := unstructured.NestedInt64(cr.Object, "metadata", "generation")
 
-	// Patch a dependency to Unmanaged — this bumps the generation.
+	// First mutation: switch sailOperator to Unmanaged.
 	wt.Patch(provider.GVK, k8sEngineCrNn(), func(obj *unstructured.Unstructured) error {
 		return unstructured.SetNestedField(
 			obj.Object, "Unmanaged",
@@ -274,9 +277,25 @@ func TestCloudManager_StatusAfterSpecChange(t *testing.T) {
 		)
 	}).Eventually().Should(Not(BeNil()))
 
-	// Status should eventually reflect the new generation.
 	wt.Get(provider.GVK, k8sEngineCrNn()).Eventually().Should(And(
-		jq.Match(`.metadata.generation > %d`, gen),
+		jq.Match(`.metadata.generation > %d`, gen1),
+		jq.Match(`.status.observedGeneration == .metadata.generation`),
+		jq.Match(`.status.phase == "Ready"`),
+	))
+
+	// Second mutation: switch it back to Managed.
+	cr = wt.Get(provider.GVK, k8sEngineCrNn()).Eventually().Should(Not(BeNil()))
+	gen2, _, _ := unstructured.NestedInt64(cr.Object, "metadata", "generation")
+
+	wt.Patch(provider.GVK, k8sEngineCrNn(), func(obj *unstructured.Unstructured) error {
+		return unstructured.SetNestedField(
+			obj.Object, "Managed",
+			"spec", "dependencies", "sailOperator", "managementPolicy",
+		)
+	}).Eventually().Should(Not(BeNil()))
+
+	wt.Get(provider.GVK, k8sEngineCrNn()).Eventually().Should(And(
+		jq.Match(`.metadata.generation > %d`, gen2),
 		jq.Match(`.status.observedGeneration == .metadata.generation`),
 		jq.Match(`.status.phase == "Ready"`),
 	))
