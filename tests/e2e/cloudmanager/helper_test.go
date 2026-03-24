@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster/gvk"
@@ -105,11 +104,3 @@ var dependencyNamespaces = []string{
 	"istio-system",
 }
 
-// GVKs for operand CRs not defined in the gvk package.
-var (
-	gvkIstio = schema.GroupVersionKind{
-		Group:   "sailoperator.io",
-		Version: "v1",
-		Kind:    "Istio",
-	}
-)

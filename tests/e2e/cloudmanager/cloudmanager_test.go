@@ -64,6 +64,14 @@ func TestCloudManager_GarbageCollectionOnDelete(t *testing.T) {
 		)
 	}
 
+	// Verify namespaces have owner references pointing to the CR.
+	for _, ns := range dependencyNamespaces {
+		wt.Get(gvk.Namespace, types.NamespacedName{Name: ns}).
+			Eventually().Should(
+			jq.Match(`.metadata.ownerReferences | length > 0`),
+		)
+	}
+
 	// Delete the CR.
 	wt.Delete(provider.GVK, k8sEngineCrNn()).Eventually().Should(Succeed())
 	wt.Get(provider.GVK, k8sEngineCrNn()).Eventually().Should(BeNil())
@@ -73,6 +81,12 @@ func TestCloudManager_GarbageCollectionOnDelete(t *testing.T) {
 		wt.Get(gvk.Deployment, types.NamespacedName{
 			Name: dep.Name, Namespace: dep.Namespace,
 		}).Eventually().Should(BeNil())
+	}
+
+	// All owned namespaces should be garbage-collected.
+	for _, ns := range dependencyNamespaces {
+		wt.Get(gvk.Namespace, types.NamespacedName{Name: ns}).
+			Eventually().Should(BeNil())
 	}
 }
 
@@ -373,7 +387,7 @@ func TestCloudManager_SailOperatorFunctional(t *testing.T) {
 
 	t.Run("Istio CR is healthy", func(t *testing.T) {
 		wt := tc.NewWithT(t)
-		wt.Get(gvkIstio, types.NamespacedName{
+		wt.Get(gvk.Istio, types.NamespacedName{
 			Name: "default", Namespace: "istio-system",
 		}).Eventually().Should(
 			jq.Match(`.status.conditions[] | select(.type == "Ready") | .status == "True"`),
