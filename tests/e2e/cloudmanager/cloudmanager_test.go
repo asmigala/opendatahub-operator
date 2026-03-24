@@ -237,10 +237,9 @@ func TestCloudManager_NamespacesCreated(t *testing.T) {
 	}
 }
 
-// TestCloudManager_ResourceCreation verifies that the Helm charts produce not
-// just deployments but the full set of supporting resources (ServiceAccounts,
-// RBAC) in each dependency namespace.
-func TestCloudManager_ResourceCreation(t *testing.T) {
+// TestCloudManager_ServiceAccountsCreated verifies that the Helm charts create
+// labeled ServiceAccounts in each dependency namespace.
+func TestCloudManager_ServiceAccountsCreated(t *testing.T) {
 	wt := tc.NewWithT(t)
 	createCR(t, wt, allManaged())
 	waitForReady(wt)
