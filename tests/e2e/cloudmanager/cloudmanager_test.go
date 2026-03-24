@@ -50,7 +50,6 @@ func TestCloudManager_DeploymentSelfHealing(t *testing.T) {
 
 // TestCloudManager_GarbageCollectionOnDelete verifies that deleting the CR
 // causes Kubernetes garbage collection to clean up all owned deployments.
-// This only works on a real cluster — envtest doesn't run the GC controller.
 func TestCloudManager_GarbageCollectionOnDelete(t *testing.T) {
 	wt := tc.NewWithT(t)
 	createCR(t, wt, allManaged())
@@ -66,8 +65,8 @@ func TestCloudManager_GarbageCollectionOnDelete(t *testing.T) {
 	}
 
 	// Delete the CR.
-	wt.Delete(provider.GVK, crNN()).Eventually().Should(Succeed())
-	wt.Get(provider.GVK, crNN()).Eventually().Should(BeNil())
+	wt.Delete(provider.GVK, k8sEngineCrNn()).Eventually().Should(Succeed())
+	wt.Get(provider.GVK, k8sEngineCrNn()).Eventually().Should(BeNil())
 
 	// All owned deployments should be garbage-collected.
 	for _, dep := range managedDependencyDeployments {
@@ -86,11 +85,11 @@ func TestCloudManager_UnmanagedNotReconciled(t *testing.T) {
 	waitForDeploymentsAvailable(wt)
 
 	// Capture the generation before patching.
-	cr := wt.Get(provider.GVK, crNN()).Eventually().Should(Not(BeNil()))
+	cr := wt.Get(provider.GVK, k8sEngineCrNn()).Eventually().Should(Not(BeNil()))
 	gen, _, _ := unstructured.NestedInt64(cr.Object, "metadata", "generation")
 
 	// Patch cert-manager to Unmanaged.
-	wt.Patch(provider.GVK, crNN(), func(obj *unstructured.Unstructured) error {
+	wt.Patch(provider.GVK, k8sEngineCrNn(), func(obj *unstructured.Unstructured) error {
 		return unstructured.SetNestedField(
 			obj.Object, "Unmanaged",
 			"spec", "dependencies", "certManager", "managementPolicy",
@@ -99,7 +98,7 @@ func TestCloudManager_UnmanagedNotReconciled(t *testing.T) {
 
 	// Wait for the controller to fully reconcile the spec change —
 	// observedGeneration must catch up to the new generation.
-	wt.Get(provider.GVK, crNN()).Eventually().Should(And(
+	wt.Get(provider.GVK, k8sEngineCrNn()).Eventually().Should(And(
 		jq.Match(`.metadata.generation > %d`, gen),
 		jq.Match(`.status.observedGeneration == .metadata.generation`),
 		jq.Match(`.status.phase == "Ready"`),
@@ -107,6 +106,7 @@ func TestCloudManager_UnmanagedNotReconciled(t *testing.T) {
 
 	// Delete the cert-manager deployment.
 	target := managedDependencyDeployments[0]
+	wt.Expect(target.Name).To(ContainSubstring("cert-manager"), "expected first managed deployment to be cert-manager")
 	nn := types.NamespacedName{Name: target.Name, Namespace: target.Namespace}
 	wt.Delete(gvk.Deployment, nn).Eventually().Should(Succeed())
 	wt.Get(gvk.Deployment, nn).Eventually().Should(BeNil())
@@ -155,7 +155,7 @@ func TestCloudManager_StatusConditions(t *testing.T) {
 
 	t.Run("Ready condition", func(t *testing.T) {
 		wt := tc.NewWithT(t)
-		wt.Get(provider.GVK, crNN()).Eventually().Should(And(
+		wt.Get(provider.GVK, k8sEngineCrNn()).Eventually().Should(And(
 			jq.Match(`.status.conditions[] | select(.type == "Ready") | .status == "True"`),
 			jq.Match(`.status.conditions[] | select(.type == "Ready") | has("lastTransitionTime")`),
 		))
@@ -163,7 +163,7 @@ func TestCloudManager_StatusConditions(t *testing.T) {
 
 	t.Run("ProvisioningSucceeded condition", func(t *testing.T) {
 		wt := tc.NewWithT(t)
-		wt.Get(provider.GVK, crNN()).Eventually().Should(And(
+		wt.Get(provider.GVK, k8sEngineCrNn()).Eventually().Should(And(
 			jq.Match(`.status.conditions[] | select(.type == "ProvisioningSucceeded") | .status == "True"`),
 			jq.Match(`.status.conditions[] | select(.type == "ProvisioningSucceeded") | has("lastTransitionTime")`),
 			jq.Match(`.status.conditions[] | select(.type == "ProvisioningSucceeded") | .observedGeneration > 0`),
@@ -172,7 +172,7 @@ func TestCloudManager_StatusConditions(t *testing.T) {
 
 	t.Run("phase and observedGeneration", func(t *testing.T) {
 		wt := tc.NewWithT(t)
-		wt.Get(provider.GVK, crNN()).Eventually().Should(And(
+		wt.Get(provider.GVK, k8sEngineCrNn()).Eventually().Should(And(
 			jq.Match(`.status.phase == "Ready"`),
 			jq.Match(`.status.observedGeneration == .metadata.generation`),
 		))
@@ -181,7 +181,7 @@ func TestCloudManager_StatusConditions(t *testing.T) {
 
 // TestCloudManager_HelmRenderedResources verifies that the Helm chart rendering
 // pipeline produces resources with the expected operator metadata. The deploy
-// action stamps every owned resource with platform labels and annotations.
+// action stamps every owned resource with infrastructure labels and annotations.
 func TestCloudManager_HelmRenderedResources(t *testing.T) {
 	wt := tc.NewWithT(t)
 	createCR(t, wt, allManaged())
@@ -195,7 +195,7 @@ func TestCloudManager_HelmRenderedResources(t *testing.T) {
 			nn := types.NamespacedName{Name: dep.Name, Namespace: dep.Namespace}
 
 			wt.Get(gvk.Deployment, nn).Eventually().Should(And(
-				jq.Match(`.metadata.labels."%s" == "%s"`, labels.PlatformPartOf, partOfValue),
+				jq.Match(`.metadata.labels."%s" == "%s"`, labels.InfrastructurePartOf, partOfValue),
 				jq.Match(`.metadata.annotations."%s" == "%s"`, annotations.InstanceName, provider.InstanceName),
 				jq.Match(`.metadata.annotations | has("%s")`, annotations.InstanceGeneration),
 				jq.Match(`.metadata.annotations | has("%s")`, annotations.InstanceUID),
@@ -206,8 +206,8 @@ func TestCloudManager_HelmRenderedResources(t *testing.T) {
 	}
 }
 
-// TestCloudManager_NamespacesCreated verifies that the pre-apply hooks create
-// the target namespaces for each managed dependency before resources are applied.
+// TestCloudManager_NamespacesCreated verifies that the target namespaces
+// for each managed dependency are created.
 func TestCloudManager_NamespacesCreated(t *testing.T) {
 	wt := tc.NewWithT(t)
 	createCR(t, wt, allManaged())
@@ -236,7 +236,7 @@ func TestCloudManager_ResourceCreation(t *testing.T) {
 			wt := tc.NewWithT(t)
 			wt.List(gvk.ServiceAccount,
 				client.InNamespace(dep.Namespace),
-				client.MatchingLabels{labels.PlatformPartOf: strings.ToLower(provider.GVK.Kind)},
+				client.MatchingLabels{labels.InfrastructurePartOf: strings.ToLower(provider.GVK.Kind)},
 			).Eventually().Should(Not(BeEmpty()))
 		})
 	}
@@ -250,11 +250,11 @@ func TestCloudManager_StatusAfterSpecChange(t *testing.T) {
 	waitForReady(wt)
 
 	// Capture the current generation.
-	cr := wt.Get(provider.GVK, crNN()).Eventually().Should(Not(BeNil()))
+	cr := wt.Get(provider.GVK, k8sEngineCrNn()).Eventually().Should(Not(BeNil()))
 	gen, _, _ := unstructured.NestedInt64(cr.Object, "metadata", "generation")
 
 	// Patch a dependency to Unmanaged — this bumps the generation.
-	wt.Patch(provider.GVK, crNN(), func(obj *unstructured.Unstructured) error {
+	wt.Patch(provider.GVK, k8sEngineCrNn(), func(obj *unstructured.Unstructured) error {
 		return unstructured.SetNestedField(
 			obj.Object, "Unmanaged",
 			"spec", "dependencies", "sailOperator", "managementPolicy",
@@ -262,7 +262,7 @@ func TestCloudManager_StatusAfterSpecChange(t *testing.T) {
 	}).Eventually().Should(Not(BeNil()))
 
 	// Status should eventually reflect the new generation.
-	wt.Get(provider.GVK, crNN()).Eventually().Should(And(
+	wt.Get(provider.GVK, k8sEngineCrNn()).Eventually().Should(And(
 		jq.Match(`.metadata.generation > %d`, gen),
 		jq.Match(`.status.observedGeneration == .metadata.generation`),
 		jq.Match(`.status.phase == "Ready"`),

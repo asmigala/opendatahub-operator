@@ -45,7 +45,7 @@ func allManaged() map[string]any {
 	}
 }
 
-func crNN() types.NamespacedName {
+func k8sEngineCrNn() types.NamespacedName {
 	return types.NamespacedName{Name: provider.InstanceName}
 }
 
@@ -55,11 +55,11 @@ func createCR(t *testing.T, wt *testf.WithT, deps map[string]any) {
 	t.Helper()
 
 	cr := newCloudManagerCR(deps)
-	wt.Create(cr, crNN()).Eventually().Should(Not(BeNil()))
+	wt.Create(cr, k8sEngineCrNn()).Eventually().Should(Not(BeNil()))
 
 	t.Cleanup(func() {
-		wt.Delete(provider.GVK, crNN()).Eventually().Should(Succeed())
-		wt.Get(provider.GVK, crNN()).Eventually().Should(BeNil())
+		wt.Delete(provider.GVK, k8sEngineCrNn()).Eventually().Should(Succeed())
+		wt.Get(provider.GVK, k8sEngineCrNn()).Eventually().Should(BeNil())
 
 		for _, dep := range managedDependencyDeployments {
 			wt.Get(gvk.Deployment, types.NamespacedName{
@@ -71,7 +71,7 @@ func createCR(t *testing.T, wt *testf.WithT, deps map[string]any) {
 
 // waitForReady waits until the CR has Ready=True in its status conditions.
 func waitForReady(wt *testf.WithT) {
-	wt.Get(provider.GVK, crNN()).Eventually().Should(
+	wt.Get(provider.GVK, k8sEngineCrNn()).Eventually().Should(
 		jq.Match(`.status.conditions[] | select(.type == "Ready") | .status == "True"`),
 	)
 }

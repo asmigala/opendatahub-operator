@@ -15,6 +15,8 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/utils/test/testf"
 )
 
+const operatorNamespace = "opendatahub-operator-system"
+
 var (
 	tc       *testf.TestContext
 	provider ProviderConfig
@@ -29,7 +31,11 @@ func TestMain(m *testing.M) {
 
 	p, ok := providers[providerName]
 	if !ok {
-		fmt.Fprintf(os.Stderr, "unknown CLOUD_MANAGER_PROVIDER %q (valid: azure, coreweave)\n", providerName)
+		valid := make([]string, 0, len(providers))
+		for _, v := range providers {
+			valid = append(valid, v.Name)
+		}
+		fmt.Fprintf(os.Stderr, "unknown CLOUD_MANAGER_PROVIDER %q (valid: %v)\n", providerName, strings.Join(valid, ", "))
 		os.Exit(1)
 	}
 	provider = p
@@ -54,7 +60,7 @@ func TestMain(m *testing.M) {
 	// precreate operator ns (would be created by helm chart, but we are installing directly)
 	operatorNs := &unstructured.Unstructured{}
 	operatorNs.SetGroupVersionKind(gvk.Namespace)
-	operatorNs.SetName("opendatahub-operator-system")
+	operatorNs.SetName(operatorNamespace)
 	if err := tc.Client().Create(tc.Context(), operatorNs); err != nil && !k8serr.IsAlreadyExists(err) {
 		fmt.Fprintf(os.Stderr, "failed to create operator namespace: %v\n", err)
 		os.Exit(1)

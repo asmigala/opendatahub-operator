@@ -82,7 +82,7 @@ jobs:
           CLOUD_MANAGER_PROVIDER: ${{ matrix.provider }}
         run: |
           set -o pipefail
-          go test -v -count=1 -timeout=15m ./tests/e2e/cloudmanager/ 2>&1 | tee test.log
+          make e2e-test-ccm 2>&1 | tee test.log
 
       - name: Collect operator logs on failure
         if: failure()

@@ -379,6 +379,10 @@ image: image-build image-push ## Build and push image with the manager.
 image-kind-load:
 	$(IMAGE_BUILDER) save $(IMG) | kind load image-archive /dev/stdin $(if $(KIND_CLUSTER_NAME),--name $(KIND_CLUSTER_NAME))
 
+.PHONY: e2e-test-ccm
+e2e-test-ccm: ## Run cloud manager e2e tests (requires CLOUD_MANAGER_PROVIDER, e.g. azure)
+	go test -v -count=1 -timeout=15m ./tests/e2e/cloudmanager/
+
 .PHONY: ccm-kind-restart
 ccm-kind-restart:
 	kubectl rollout restart -n opendatahub-cloudmanager-system deployment -l control-plane=controller-manager
@@ -802,7 +806,6 @@ CCM_UNDEPLOY_TARGETS := $(addprefix undeploy-ccm-,$(CCM_PROVIDERS))
 .PHONY: $(CCM_UNDEPLOY_TARGETS)
 $(CCM_UNDEPLOY_TARGETS): undeploy-ccm-%: kustomize ## Undeploy CCM from cluster (e.g., undeploy-ccm-azure)
 	$(KUSTOMIZE) build $(call ccm-config-dir,$*)/$(CCM_DEPLOY_OVERLAY) | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
-
 
 # Cleanup
 $(foreach p,$(CCM_PROVIDERS),$(eval CLEANFILES += $(call ccm-config-dir,$(p))/crd/bases $(call ccm-config-dir,$(p))/rbac/role.yaml))
