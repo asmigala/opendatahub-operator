@@ -58,8 +58,11 @@ func createCR(t *testing.T, wt *testf.WithT, deps map[string]any) {
 
 	t.Cleanup(func() {
 		wt.Delete(provider.GVK, k8sEngineCrNn()).Eventually().Should(Succeed())
+		// Wait for the CR to be fully removed — Delete is async, so
+		// we poll until the API returns NotFound.
 		wt.Get(provider.GVK, k8sEngineCrNn()).Eventually().Should(BeNil())
 
+		// Wait for GC to clean up owned deployments.
 		for _, dep := range managedDependencyDeployments {
 			wt.Get(gvk.Deployment, types.NamespacedName{
 				Name: dep.Name, Namespace: dep.Namespace,
