@@ -44,7 +44,7 @@ func TestCloudManager_InvalidNameRejected(t *testing.T) {
 //  3. StatusAfterSpecChange — mutates spec but restores to all-Managed
 //  4. UnmanagedNotReconciled — switches cert-manager to Unmanaged
 //  5. GarbageCollectionOnDelete — deletes the CR (must be last)
-func TestCloudManager(t *testing.T) {
+func TestCloudManager(t *testing.T) { //nolint:maintidx // sequential subtests sharing one CR lifecycle are clearer inline
 	wt := tc.NewWithT(t)
 
 	cr := newCloudManagerCR(allManaged())
