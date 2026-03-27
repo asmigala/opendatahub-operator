@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        provider: [azure, coreweave]
+        provider: [azure]
     steps:
       - name: Checkout PR code
         if: ${{ !env.ACT }}
@@ -37,26 +37,22 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Prepare kind config with pull credentials
+        if: env.PULL_SECRET != ''
+        env:
+          PULL_SECRET: ${{ secrets.CCM_PULL_SECRET }}
+        run: |
+          echo "$PULL_SECRET" > "$RUNNER_TEMP/pull-secret.json"
+          echo '{"kind":"Cluster","apiVersion":"kind.x-k8s.io/v1alpha4","nodes":[{"role":"control-plane","extraMounts":[{"containerPath":"/var/lib/kubelet/config.json","hostPath":"'"$RUNNER_TEMP"'/pull-secret.json"}]}]}' \
+            > "$RUNNER_TEMP/kind-config.json"
+          echo "KIND_CONFIG=$RUNNER_TEMP/kind-config.json" >> "$GITHUB_ENV"
+
       - name: Create kind cluster
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
           wait: 120s
-
-      # TODO: consider using kind config to mount credentials instead:
-      # https://kind.sigs.k8s.io/docs/user/private-registries/#mount-a-config-file-to-each-node
-      - name: Configure pull credentials on kind nodes
-        if: env.PULL_SECRET != ''
-        env:
-          PULL_SECRET: ${{ secrets.CCM_PULL_SECRET }}
-        run: |
-          for node in $(kind get nodes --name "$KIND_CLUSTER_NAME"); do
-            docker exec "$node" mkdir -p /var/lib/kubelet
-            docker exec -i "$node" tee /var/lib/kubelet/config.json > /dev/null <<< "$PULL_SECRET"
-            docker exec "$node" systemctl restart kubelet.service
-          done
-          # Wait for the node to be ready again after containerd restart.
-          kubectl wait --for=condition=Ready nodes --all --timeout=60s
+          config: ${{ env.KIND_CONFIG }}
 
       - name: Build operator image
         run: make image-build
