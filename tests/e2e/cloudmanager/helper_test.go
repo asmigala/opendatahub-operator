@@ -100,9 +100,3 @@ func consistentlyGone(wt *testf.WithT, nn types.NamespacedName) {
 		Should(BeNil())
 }
 
-// dependencyNamespaces lists the namespaces that the pre-apply hooks should create.
-var dependencyNamespaces = []string{
-	"cert-manager-operator",
-	"openshift-lws-operator",
-	"istio-system",
-}

@@ -383,10 +383,6 @@ image-kind-load:
 e2e-test-ccm: ## Run cloud manager e2e tests (requires CLOUD_MANAGER_PROVIDER, e.g. azure)
 	go test -v -count=1 -timeout=30m ./tests/e2e/cloudmanager/
 
-.PHONY: ccm-kind-restart
-ccm-kind-restart:
-	kubectl rollout restart -n opendatahub-cloudmanager-system deployment -l control-plane=controller-manager
-
 ##@ Deployment
 
 ifndef ignore-not-found

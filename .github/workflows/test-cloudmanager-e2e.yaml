@@ -43,6 +43,8 @@ jobs:
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
           wait: 120s
 
+      # TODO: consider using kind config to mount credentials instead:
+      # https://kind.sigs.k8s.io/docs/user/private-registries/#mount-a-config-file-to-each-node
       - name: Configure pull credentials on kind nodes
         if: env.PULL_SECRET != ''
         env:
@@ -63,13 +65,7 @@ jobs:
         run: make image-kind-load
 
       - name: Deploy cloud manager
-        run: |
-          make deploy-ccm-${{ matrix.provider }}
-          DEPLOY_NAME="${{ matrix.provider }}-cloud-manager-operator"
-          kubectl patch deployment "$DEPLOY_NAME" \
-            -n opendatahub-cloudmanager-system \
-            --type=json \
-            -p='[{"op":"replace","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"IfNotPresent"}]'
+        run: make deploy-ccm-local-${{ matrix.provider }}
 
       - name: Wait for cloud manager to be ready
         run: |
