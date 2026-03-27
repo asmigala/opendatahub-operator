@@ -1,12 +1,12 @@
 package cloudmanager_test
 
 import (
-	"testing"
 	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 
+	ccmapi "github.com/opendatahub-io/opendatahub-operator/v2/api/cloudmanager/common"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/cluster/gvk"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/utils/test/matchers/jq"
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/utils/test/testf"
@@ -36,39 +36,17 @@ func newCloudManagerCR(deps map[string]any) *unstructured.Unstructured {
 }
 
 func allManaged() map[string]any {
+	managed := string(ccmapi.Managed)
 	return map[string]any{
-		"certManager":  map[string]any{"managementPolicy": "Managed"},
-		"lws":          map[string]any{"managementPolicy": "Managed"},
-		"sailOperator": map[string]any{"managementPolicy": "Managed"},
-		"gatewayAPI":   map[string]any{"managementPolicy": "Managed"},
+		"certManager":  map[string]any{"managementPolicy": managed},
+		"lws":          map[string]any{"managementPolicy": managed},
+		"sailOperator": map[string]any{"managementPolicy": managed},
+		"gatewayAPI":   map[string]any{"managementPolicy": managed},
 	}
 }
 
 func k8sEngineCrNn() types.NamespacedName {
 	return types.NamespacedName{Name: provider.InstanceName}
-}
-
-// createK8sEngineCR creates the cloud manager CR with the given dependencies and registers
-// cleanup to delete the CR and wait for managed deployments to be garbage collected.
-func createK8sEngineCR(t *testing.T, wt *testf.WithT, deps map[string]any) {
-	t.Helper()
-
-	cr := newCloudManagerCR(deps)
-	wt.Create(cr, k8sEngineCrNn()).Eventually().Should(Not(BeNil()))
-
-	t.Cleanup(func() {
-		wt.Delete(provider.GVK, k8sEngineCrNn()).Eventually().Should(Succeed())
-		// Wait for the CR to be fully removed — Delete is async, so
-		// we poll until the API returns NotFound.
-		wt.Get(provider.GVK, k8sEngineCrNn()).Eventually().Should(BeNil())
-
-		// Wait for GC to clean up owned deployments.
-		for _, dep := range managedDependencyDeployments {
-			wt.Get(gvk.Deployment, types.NamespacedName{
-				Name: dep.Name, Namespace: dep.Namespace,
-			}).Eventually().Should(BeNil())
-		}
-	})
 }
 
 // waitForReady waits until the CR has Ready=True in its status conditions.

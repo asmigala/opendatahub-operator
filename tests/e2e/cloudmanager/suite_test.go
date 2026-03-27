@@ -15,7 +15,7 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/v2/pkg/utils/test/testf"
 )
 
-const operatorNamespace = "opendatahub-operator-system"
+const rhaiOperatorNamespace = "opendatahub-operator-system"
 
 var (
 	tc       *testf.TestContext
@@ -60,7 +60,7 @@ func TestMain(m *testing.M) {
 	// precreate operator ns (would be created by helm chart, but we are installing directly)
 	operatorNs := &unstructured.Unstructured{}
 	operatorNs.SetGroupVersionKind(gvk.Namespace)
-	operatorNs.SetName(operatorNamespace)
+	operatorNs.SetName(rhaiOperatorNamespace)
 	if err := tc.Client().Create(tc.Context(), operatorNs); err != nil && !k8serr.IsAlreadyExists(err) {
 		fmt.Fprintf(os.Stderr, "failed to create operator namespace: %v\n", err)
 		os.Exit(1)
