@@ -4,6 +4,7 @@ on:
     types: [opened, labeled, synchronize, reopened]
     branches:
       - main
+  workflow_dispatch: # temporary, remove before merging
 
 permissions:
   contents: read
@@ -17,7 +18,7 @@ jobs:
     name: Cloud Manager E2E (${{ matrix.provider }})
     # Label gate: only runs when a maintainer adds this label, preventing
     # untrusted fork PRs from executing arbitrary code with repo secrets.
-    if: contains(github.event.pull_request.labels.*.name, 'run-cloudmanager-e2e')
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'run-cloudmanager-e2e')
     runs-on: ubuntu-latest
     env:
       KIND_CLUSTER_NAME: kind-${{ matrix.provider }}
