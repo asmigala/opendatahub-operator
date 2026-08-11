@@ -2,7 +2,7 @@ name: Freeze window hold automation
 
 on:
   pull_request_target:
-    types: [opened, labeled, unlabeled, synchronize]
+    types: [opened, edited, labeled, unlabeled, synchronize]
   push:
     branches: [main]
     paths: ['.github/freeze.json']
@@ -54,6 +54,17 @@ jobs:
               'odh-drs-automation-bot[bot]',
             ];
             const EXEMPT_BRANCHES = ['sync/upgrade-manifest-shas'];
+
+            // A PR's release target is set via its description `Release:` field,
+            // the same source of truth the pr-release-label workflow reads. We
+            // check both the description AND the applied label because they can
+            // legitimately diverge in time: on `opened` both workflows run
+            // concurrently so the label may not exist yet, and pr-release-label
+            // writes the label with GITHUB_TOKEN (which does not re-trigger this
+            // workflow). Reading the description makes the exemption immediate
+            // and independent of that race; the label check additionally honors
+            // release labels applied manually without editing the description.
+            const RELEASE_FIELD_RE = /^Release:\s*(rhoai-\d+\.\d+(?:ea\d+)?)\s*$/m;
 
             // --- Parse freeze config ---
 
@@ -150,8 +161,12 @@ jobs:
               }
 
               const hasHold = prLabels.includes(HOLD_LABEL);
-              const hasReleaseLabel = freezeActive &&
-                exemptLabels.some(label => prLabels.includes(label));
+              const bodyMatch = (pr.body || '').match(RELEASE_FIELD_RE);
+              const bodyRelease = bodyMatch ? bodyMatch[1] : null;
+              const hasReleaseLabel = freezeActive && (
+                exemptLabels.some(label => prLabels.includes(label)) ||
+                (bodyRelease !== null && exemptLabels.includes(bodyRelease))
+              );
 
               if (freezeActive && !hasReleaseLabel && !hasHold) {
                 await github.rest.issues.addLabels({
