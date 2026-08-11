@@ -1,4 +1,8 @@
 {
   "hold-window-days": 7,
-  "releases": []
+  "releases": [
+    {"label": "rhoai-3.5", "freeze": "2026-07-29"},
+    {"label": "rhoai-3.6", "freeze": "2026-08-15"},
+    {"label": "rhoai-3.7", "freeze": "2026-09-15"}
+  ]
 }
